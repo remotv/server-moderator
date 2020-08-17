@@ -59,7 +59,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
         for (server of Object.values(state.servers)) {
             if (reaction.message.id === server.message_id) {
                 if (reaction.emoji.name === "❌") {
-                    denyServer(server.server_id);
+                    denyServer(server.server_id, user.id);
                 }
             }
         }
@@ -85,7 +85,8 @@ ws.onmessage = async (event) => {
             state.servers[data.d.server.server_id] = {
                 server_id: data.d.server.server_id,
                 server_name: data.d.server.server_name,
-                message_id: msg.id
+                message_id: msg.id,
+                owner: data.d.user.username
             };
             saveState();
             await msg.react("❌");
@@ -105,7 +106,7 @@ ws.onmessage = async (event) => {
                     const embed = new Discord.MessageEmbed()
                         .setTitle("Server deleted")
                         .setColor(0x1D1075)
-                        .setDescription(`Deleted server ${server.server_name}`);
+                        .setDescription(`Deleted server ${server.server_name}\nCreated by ${server.owner}\nDeleted by <@${server.actioner}>`);
                     
                     await logChannel.send(embed);
                 }
@@ -113,16 +114,15 @@ ws.onmessage = async (event) => {
                 removeServerFromQueue(server.server_id);
             }
         }
-    } else {
-        console.log(data);
-    }
+    } 
 };
 
-const denyServer = (id) => {
+const denyServer = (id, actioner) => {
     console.log("Trying to deny server");
     try {
         const server = state.servers[id];
         if (server) {
+            server.actioner = actioner;
             ws.send(
                 JSON.stringify({
                     e: "DELETE_ROBOT_SERVER",
